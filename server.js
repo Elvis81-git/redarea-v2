@@ -149,7 +149,9 @@ const ITEMS = {
   backpack_small: { id: 'backpack_small', name: '戰術背包', width: 2, height: 2, type: 'backpack', cols: 4, rows: 4, price: 1500, sellPrice: 750 },
   bandage: { id: 'bandage', name: '醫用繃帶', width: 1, height: 1, type: 'med', maxStack: 3, heal: 30, useTime: 2000, price: 200, sellPrice: 100 },
   medkit: { id: 'medkit', name: '醫療包', width: 2, height: 1, type: 'med', maxStack: 1, heal: 80, useTime: 4000, price: 600, sellPrice: 300 },
-  cheat_card: { id: 'cheat_card', name: '全圖雷達作弊卡', width: 1, height: 1, type: 'special', price: 1000, sellPrice: 500 }
+  cheat_card: { id: 'cheat_card', name: '全圖雷達作弊卡', width: 1, height: 1, type: 'special', price: 1000, sellPrice: 500 },
+  trash_jiang: { id: 'trash_jiang', name: '江東其的垃圾', width: 1, height: 1, type: 'trash', price: 999999, sellPrice: -100 },
+  trash_yang: { id: 'trash_yang', name: '楊翰顯的垃圾', width: 1, height: 1, type: 'trash', price: 999999, sellPrice: -100 }
 };
 
 // Generic function to retrieve stats for a specific item instance including rarity multipliers
@@ -164,13 +166,20 @@ function getItemStats(item) {
     white: { price: 1.0, stat: 1.0 },
     green: { price: 1.5, stat: 1.2 },
     blue: { price: 2.25, stat: 1.44 },
+    purple: { price: 2.5, stat: 1.6 },
     gold: { price: 3.375, stat: 1.728 },
     red: { price: 5.0625, stat: 2.0736 }
   };
 
-  const f = rarityFactors[stats.rarity];
+  const f = rarityFactors[stats.rarity] || { price: 1.0, stat: 1.0 };
   stats.price = Math.round(baseInfo.price * f.price);
   stats.sellPrice = Math.round(baseInfo.sellPrice * f.price);
+
+  if (stats.type === 'trash') {
+    stats.rarity = 'purple';
+    stats.price = 999999;
+    stats.sellPrice = -100;
+  }
 
   if (stats.type === 'weapon' && baseInfo.baseDamage) {
     stats.baseDamage = Math.round(baseInfo.baseDamage * f.stat);
@@ -549,6 +558,10 @@ function getRandomRarity() {
 
 // Populate containers
 function populateContainer(c) {
+  if (c.isTrashTrap) {
+    c.items = [];
+    return;
+  }
   const items = [];
   const size = 4; // 4x4 containers
   // Randomly distribute items based on type
@@ -583,7 +596,24 @@ function populateContainer(c) {
     items.push({ id: 'loot-' + Math.random(), type: 'bandage', rarity: 'white', x: 0, y: 2, count: 3 });
     items.push({ id: 'loot-' + Math.random(), type: 'ammo_9mm', rarity: 'white', x: 1, y: 2, count: 50 });
   }
+
   c.items = items;
+}
+
+function assignTrashTrap() {
+  staticContainers.forEach(box => {
+    box.isTrashTrap = false;
+    const cur = containers.get(box.id);
+    if (cur) cur.isTrashTrap = false;
+  });
+  const trapIndex = Math.floor(Math.random() * staticContainers.length);
+  staticContainers[trapIndex].isTrashTrap = true;
+  const trapBoxId = staticContainers[trapIndex].id;
+  const trapBox = containers.get(trapBoxId);
+  if (trapBox) {
+    trapBox.isTrashTrap = true;
+    trapBox.items = []; // It's a trap, no other items!
+  }
 }
 
 staticContainers.forEach(box => {
@@ -592,18 +622,20 @@ staticContainers.forEach(box => {
   box.rows = 4;
   containers.set(box.id, box);
 });
+assignTrashTrap();
 
 // Respawn containers checker
 setInterval(() => {
   staticContainers.forEach(box => {
     const cur = containers.get(box.id);
-    if (!cur || cur.items.length === 0) {
+    if (!cur || cur.items.length === 0 || cur.isTrashTrap) {
       populateContainer(box);
       box.cols = 4;
       box.rows = 4;
       containers.set(box.id, box);
     }
   });
+  assignTrashTrap();
 }, 120000); // refill containers every 2 mins if they are cleared
 
 const candidateBotNames = ['方文奕', '王域魁', '伍益叡', '江東其', '林家豪', '楊翰顯', '潘廷育', '鄭喬澤', '阮聖慧'];
@@ -867,28 +899,38 @@ function packItemsIntoCorpse(equipped, stashItems, corpseItems) {
   const cols = 6;
   const rows = 6;
   
+  const isTrash = (item) => item && ITEMS[item.type] && ITEMS[item.type].type === 'trash';
+
   // Gather all items that were on the corpse
   const itemsToPack = [];
-  if (equipped.helmet) itemsToPack.push(equipped.helmet);
-  if (equipped.armor) itemsToPack.push(equipped.armor);
-  if (equipped.weapon) itemsToPack.push(equipped.weapon);
-  if (equipped.pocket1) itemsToPack.push(equipped.pocket1);
-  if (equipped.pocket2) itemsToPack.push(equipped.pocket2);
-  if (equipped.ammo) itemsToPack.push(equipped.ammo);
-  if (equipped.quick1) itemsToPack.push(equipped.quick1);
-  if (equipped.quick2) itemsToPack.push(equipped.quick2);
-  if (equipped.quick3) itemsToPack.push(equipped.quick3);
-  if (equipped.quick4) itemsToPack.push(equipped.quick4);
-  if (equipped.quick5) itemsToPack.push(equipped.quick5);
+  if (equipped.helmet && !isTrash(equipped.helmet)) itemsToPack.push(equipped.helmet);
+  if (equipped.armor && !isTrash(equipped.armor)) itemsToPack.push(equipped.armor);
+  if (equipped.weapon && !isTrash(equipped.weapon)) itemsToPack.push(equipped.weapon);
+  if (equipped.pocket1 && !isTrash(equipped.pocket1)) itemsToPack.push(equipped.pocket1);
+  if (equipped.pocket2 && !isTrash(equipped.pocket2)) itemsToPack.push(equipped.pocket2);
+  if (equipped.ammo && !isTrash(equipped.ammo)) itemsToPack.push(equipped.ammo);
+  if (equipped.quick1 && !isTrash(equipped.quick1)) itemsToPack.push(equipped.quick1);
+  if (equipped.quick2 && !isTrash(equipped.quick2)) itemsToPack.push(equipped.quick2);
+  if (equipped.quick3 && !isTrash(equipped.quick3)) itemsToPack.push(equipped.quick3);
+  if (equipped.quick4 && !isTrash(equipped.quick4)) itemsToPack.push(equipped.quick4);
+  if (equipped.quick5 && !isTrash(equipped.quick5)) itemsToPack.push(equipped.quick5);
   
   // Backpack itself and its contents
   if (equipped.backpack) {
-    const bpItems = equipped.backpack.items || [];
-    bpItems.forEach(item => itemsToPack.push(item));
-    // Clear inner items references and push the backpack itself
-    const backpackClean = { ...equipped.backpack };
-    delete backpackClean.items;
-    itemsToPack.push(backpackClean);
+    const hasTrash = equipped.backpack.items && equipped.backpack.items.some(it => isTrash(it));
+    if (hasTrash) {
+      // Only drop non-trash items inside the backpack
+      const nonTrashItems = equipped.backpack.items.filter(it => !isTrash(it));
+      nonTrashItems.forEach(item => itemsToPack.push(item));
+      // Backpack itself does NOT drop
+    } else {
+      // Normal behavior: drop backpack and all its items
+      const bpItems = equipped.backpack.items || [];
+      bpItems.forEach(item => itemsToPack.push(item));
+      const backpackClean = { ...equipped.backpack };
+      delete backpackClean.items;
+      itemsToPack.push(backpackClean);
+    }
   }
 
   // Pack them
@@ -954,12 +996,8 @@ function tick() {
       p.reloadTimer -= 50;
       if (p.reloadTimer <= 0) {
         p.reloading = false;
-        // Refill magazine
-        const info = ITEMS[p.weaponType];
-        if (info) {
-          p.ammoCount = info.maxAmmo;
-          p.socket.emit('reload_complete', { ammoCount: p.ammoCount });
-        }
+        // Refill magazine completed (p.ammoCount was already updated in player_reload)
+        p.socket.emit('reload_complete', { ammoCount: p.ammoCount });
       }
     }
 
@@ -985,6 +1023,75 @@ function tick() {
         p.searchTimer = 0;
         const c = containers.get(cId);
         if (c) {
+          if (c.isTrashTrap) {
+            const trashType = Math.random() < 0.5 ? 'trash_jiang' : 'trash_yang';
+            const trashName = trashType === 'trash_jiang' ? '江東其的垃圾' : '楊翰顯的垃圾';
+
+            if (!p.equipped.backpack) {
+              p.equipped.backpack = { type: null, items: [] };
+            }
+            const dims = getPlayerBagDimensions(p.equipped, p.level);
+            const bpCols = dims.cols;
+            const bpRows = dims.rows;
+            const bpItems = p.equipped.backpack.items || [];
+
+            const fullGrid = Array(bpRows).fill(null).map(() => Array(bpCols).fill(false));
+            for (const it of bpItems) {
+              const itInfo = ITEMS[it.type];
+              if (!itInfo) continue;
+              for (let r = 0; r < itInfo.height; r++) {
+                for (let c = 0; c < itInfo.width; c++) {
+                  const gy = it.y + r;
+                  const gx = it.x + c;
+                  if (gy >= 0 && gy < bpRows && gx >= 0 && gx < bpCols) {
+                    fullGrid[gy][gx] = true;
+                  }
+                }
+              }
+            }
+
+            for (let y = 0; y < bpRows; y++) {
+              for (let x = 0; x < bpCols; x++) {
+                if (!fullGrid[y][x]) {
+                  bpItems.push({
+                    id: 'trash-' + Math.random(),
+                    type: trashType,
+                    x: x,
+                    y: y,
+                    count: 1
+                  });
+                }
+              }
+            }
+
+            p.equipped.backpack.items = bpItems;
+
+            containers.delete(cId);
+
+            p.socket.emit('unequip_success', { equipped: p.equipped });
+            p.socket.emit('error_msg', { message: `⚠️ 你觸發了垃圾陷阱箱！背包已被 ${trashName} 塞滿！` });
+            p.socket.emit('container_closed');
+            
+            let questsChanged = false;
+            if (p.quests) {
+              p.quests = p.quests.map(q => {
+                if (q.id === 'search_boxes' && q.progress < q.target) {
+                  q.progress++;
+                  questsChanged = true;
+                }
+                return q;
+              });
+            }
+            if (questsChanged) {
+              db.prepare('UPDATE users SET quests_json = ? WHERE id = ?').run(
+                JSON.stringify(p.quests),
+                p.userId
+              );
+              p.socket.emit('quests_updated', { quests: p.quests });
+            }
+            return;
+          }
+
           // Increment quest progress for search_boxes
           let questsChanged = false;
           if (p.quests) {
@@ -1559,26 +1666,43 @@ function handlePlayerDeath(socketId, p, killerId) {
   packItemsIntoCorpse(p.equipped, p.stash, corpse.items);
   containers.set(corpseId, corpse);
 
-  // Remove corpse after 5 mins
+  // Remove corpse after 30 seconds
   setTimeout(() => {
     containers.delete(corpseId);
-  }, 300000);
+    raidPlayers.forEach(player => {
+      if (player.searchingContainerId === corpseId) {
+        player.searchingContainerId = null;
+        player.socket.emit('container_closed');
+      }
+    });
+  }, 30000);
 
   // 2. Wipe player equipped gear and save to db (Lost all gear!)
+  const isTrash = (item) => item && ITEMS[item.type] && ITEMS[item.type].type === 'trash';
   const updatedEquipped = {
-    helmet: null,
-    armor: null,
-    weapon: null,
-    backpack: null,
-    pocket1: null,
-    pocket2: null,
-    ammo: null,
-    quick1: null,
-    quick2: null,
-    quick3: null,
-    quick4: null,
-    quick5: null
+    helmet: isTrash(p.equipped.helmet) ? p.equipped.helmet : null,
+    armor: isTrash(p.equipped.armor) ? p.equipped.armor : null,
+    weapon: isTrash(p.equipped.weapon) ? p.equipped.weapon : null,
+    pocket1: isTrash(p.equipped.pocket1) ? p.equipped.pocket1 : null,
+    pocket2: isTrash(p.equipped.pocket2) ? p.equipped.pocket2 : null,
+    ammo: isTrash(p.equipped.ammo) ? p.equipped.ammo : null,
+    quick1: isTrash(p.equipped.quick1) ? p.equipped.quick1 : null,
+    quick2: isTrash(p.equipped.quick2) ? p.equipped.quick2 : null,
+    quick3: isTrash(p.equipped.quick3) ? p.equipped.quick3 : null,
+    quick4: isTrash(p.equipped.quick4) ? p.equipped.quick4 : null,
+    quick5: isTrash(p.equipped.quick5) ? p.equipped.quick5 : null,
+    backpack: null
   };
+
+  if (p.equipped.backpack) {
+    const hasTrash = p.equipped.backpack.items && p.equipped.backpack.items.some(it => isTrash(it));
+    if (hasTrash) {
+      updatedEquipped.backpack = {
+        ...p.equipped.backpack,
+        items: p.equipped.backpack.items.filter(it => isTrash(it))
+      };
+    }
+  }
 
   try {
     updateUserStash.run(
@@ -1670,10 +1794,16 @@ function handleBotDeath(bot, killerId) {
   corpse.items = lootItems;
   containers.set(corpseId, corpse);
 
-  // Delete bot corpse after 5 mins
+  // Delete bot corpse after 30 seconds
   setTimeout(() => {
     containers.delete(corpseId);
-  }, 300000);
+    raidPlayers.forEach(player => {
+      if (player.searchingContainerId === corpseId) {
+        player.searchingContainerId = null;
+        player.socket.emit('container_closed');
+      }
+    });
+  }, 30000);
 
   // Reward XP to killer
   const killer = raidPlayers.get(killerId);
@@ -1940,6 +2070,7 @@ io.on('connection', (socket) => {
 
     // Fast-track reload for infinite pistol
     if (p.weaponType === 'pistol_infinite') {
+      p.ammoCount = wInfo.maxAmmo;
       p.reloading = true;
       p.reloadTimer = wInfo.reloadTime;
       socket.emit('reload_start', { reloadTime: wInfo.reloadTime });
@@ -1996,6 +2127,7 @@ io.on('connection', (socket) => {
     p.reloading = true;
     p.reloadTimer = wInfo.reloadTime;
 
+    socket.emit('unequip_success', { equipped: p.equipped });
     socket.emit('reload_start', { reloadTime: wInfo.reloadTime });
   });
 
@@ -2215,6 +2347,39 @@ io.on('connection', (socket) => {
       y: targetY,
       count: item.count
     });
+
+    // If it is a trash item, auto-fill all remaining slots in the backpack!
+    if (info.type === 'trash') {
+      const fullGrid = Array(bpRows).fill(null).map(() => Array(bpCols).fill(false));
+      for (const it of bpItems) {
+        const itInfo = ITEMS[it.type];
+        if (!itInfo) continue;
+        for (let r = 0; r < itInfo.height; r++) {
+          for (let c = 0; c < itInfo.width; c++) {
+            const gy = it.y + r;
+            const gx = it.x + c;
+            if (gy >= 0 && gy < bpRows && gx >= 0 && gx < bpCols) {
+              fullGrid[gy][gx] = true;
+            }
+          }
+        }
+      }
+      // Fill all empty slots with 1x1 trash items of the same type
+      for (let y = 0; y < bpRows; y++) {
+        for (let x = 0; x < bpCols; x++) {
+          if (!fullGrid[y][x]) {
+            bpItems.push({
+              id: 'trash-' + Math.random(),
+              type: item.type,
+              x: x,
+              y: y,
+              count: 1
+            });
+          }
+        }
+      }
+    }
+
     p.equipped.backpack.items = bpItems;
 
     // Refresh inventory and container for client
@@ -2372,6 +2537,10 @@ io.on('connection', (socket) => {
     const item = bpItems[itemIdx];
     const info = ITEMS[item.type];
 
+    if (info.type === 'trash') {
+      return socket.emit('error_msg', { message: '垃圾無法遺棄至箱子內，必須帶回大廳處置！' });
+    }
+
     const cCols = 4;
     const cRows = 4;
     let targetX = toX;
@@ -2446,13 +2615,26 @@ io.on('connection', (socket) => {
       type = item.type;
       count = item.count;
       ammoCount = item.ammoCount;
-      bpItems.splice(itemIdx, 1);
     } else if (source === 'equipped') {
       item = p.equipped[slot];
       if (!item) return;
       type = item.type;
       count = item.count;
       ammoCount = item.ammoCount;
+    }
+
+    if (!item) return;
+
+    if (type === 'trash_jiang' || type === 'trash_yang') {
+      return socket.emit('error_msg', { message: '垃圾無法丟棄，必須帶回大廳處置！' });
+    }
+
+    // Perform actual removal now that we confirmed it's not trash
+    if (source === 'backpack') {
+      const bpItems = p.equipped.backpack.items;
+      const itemIdx = bpItems.findIndex(it => it.id === itemId);
+      if (itemIdx !== -1) bpItems.splice(itemIdx, 1);
+    } else if (source === 'equipped') {
       p.equipped[slot] = null;
       if (slot === 'weapon') {
         p.weaponType = null;
@@ -2460,8 +2642,6 @@ io.on('connection', (socket) => {
         p.ammoCount = 0;
       }
     }
-
-    if (!item) return;
 
     // Create container
     const dropId = 'dropped-' + Date.now() + '-' + Math.round(Math.random() * 10000);

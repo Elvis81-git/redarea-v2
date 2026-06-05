@@ -12,7 +12,9 @@ const ITEMS = {
   backpack_small: { id: 'backpack_small', name: '戰術背包', width: 2, height: 2, type: 'backpack', cols: 4, rows: 4, price: 1500, sellPrice: 750 },
   bandage: { id: 'bandage', name: '醫用繃帶', width: 1, height: 1, type: 'med', maxStack: 3, heal: 30, useTime: 2000, price: 200, sellPrice: 100 },
   medkit: { id: 'medkit', name: '醫療包', width: 2, height: 1, type: 'med', maxStack: 1, heal: 80, useTime: 4000, price: 600, sellPrice: 300 },
-  cheat_card: { id: 'cheat_card', name: '全圖雷達作弊卡', width: 1, height: 1, type: 'special', price: 1000, sellPrice: 500 }
+  cheat_card: { id: 'cheat_card', name: '全圖雷達作弊卡', width: 1, height: 1, type: 'special', price: 1000, sellPrice: 500 },
+  trash_jiang: { id: 'trash_jiang', name: '江東其的垃圾', width: 1, height: 1, type: 'trash', price: 999999, sellPrice: -100 },
+  trash_yang: { id: 'trash_yang', name: '楊翰顯的垃圾', width: 1, height: 1, type: 'trash', price: 999999, sellPrice: -100 }
 };
 
 // Generic function to retrieve stats for a specific item instance including rarity multipliers
@@ -27,13 +29,20 @@ function getItemStats(item) {
     white: { price: 1.0, stat: 1.0 },
     green: { price: 1.5, stat: 1.2 },
     blue: { price: 2.25, stat: 1.44 },
+    purple: { price: 2.5, stat: 1.6 },
     gold: { price: 3.375, stat: 1.728 },
     red: { price: 5.0625, stat: 2.0736 }
   };
 
-  const f = rarityFactors[stats.rarity];
+  const f = rarityFactors[stats.rarity] || { price: 1.0, stat: 1.0 };
   stats.price = Math.round(baseInfo.price * f.price);
   stats.sellPrice = Math.round(baseInfo.sellPrice * f.price);
+
+  if (stats.type === 'trash') {
+    stats.rarity = 'purple';
+    stats.price = 999999;
+    stats.sellPrice = -100;
+  }
 
   if (stats.type === 'weapon' && baseInfo.baseDamage) {
     stats.baseDamage = Math.round(baseInfo.baseDamage * f.stat);
@@ -747,9 +756,8 @@ function handleGridDrop(e, grid, destLocation) {
     maxRows = 100;
     existingItems = currentUser.stash;
   } else if (destLocation === 'backpack') {
-    if (!currentUser.equipped.backpack || currentUser.equipped.backpack.type === null) {
-      showAnnouncement('您沒有裝備背包，無法放入物品！', 'error');
-      return;
+    if (!currentUser.equipped.backpack) {
+      currentUser.equipped.backpack = { type: null, items: [] };
     }
     const dims = getPlayerBagDimensions(currentUser.equipped, currentUser.level);
     maxCols = dims.cols;
@@ -924,9 +932,8 @@ function handleSlotDrop(e, slot) {
       }
     } else if (draggedItem.originSlot === 'backpack') {
       // 暫時將 draggedItem 從背包拿掉
-      if (!currentUser.equipped.backpack || currentUser.equipped.backpack.type === null) {
-        showAnnouncement('您沒有裝備背包，無法替換物品！', 'error');
-        return;
+      if (!currentUser.equipped.backpack) {
+        currentUser.equipped.backpack = { type: null, items: [] };
       }
       const tempBagItems = currentUser.equipped.backpack.items.filter(it => it.id !== draggedItem.itemRef.id);
       const dims = getPlayerBagDimensions(currentUser.equipped, currentUser.level);
@@ -1100,6 +1107,15 @@ function handleRaidContextMenu(e, item, location) {
     itemEquip.classList.add('hidden');
     itemQuickSubmenu.classList.add('hidden');
     itemDrop.classList.remove('hidden');
+  }
+
+  // Force hide discard options for trash items
+  if (info.type === 'trash') {
+    itemPut.classList.add('hidden');
+    itemDrop.classList.add('hidden');
+    itemUse.classList.add('hidden');
+    itemEquip.classList.add('hidden');
+    itemQuickSubmenu.classList.add('hidden');
   }
 }
 
@@ -1472,27 +1488,28 @@ document.getElementById('ctx-unequip').addEventListener('click', () => {
   }
 
   // 2. Try backpack
-  if (currentUser.equipped.backpack && currentUser.equipped.backpack.type !== null) {
-    space = findFreeLobbyBagSpace(info.width, info.height);
-    if (space) {
-      currentUser.equipped[contextActiveLocation] = null;
-      if (!currentUser.equipped.backpack.items) {
-        currentUser.equipped.backpack.items = [];
-      }
-      currentUser.equipped.backpack.items.push({
-        id: contextActiveItem.id,
-        type: contextActiveItem.type,
-        x: space.x,
-        y: space.y,
-        count: contextActiveItem.count
-      });
-      saveLobbyData();
-      renderStash();
-      renderLobbyBackpack();
-      renderEquipped();
-      showAnnouncement(`已卸下 ${info.name} 至背包`, 'success');
-      return;
+  if (!currentUser.equipped.backpack) {
+    currentUser.equipped.backpack = { type: null, items: [] };
+  }
+  space = findFreeLobbyBagSpace(info.width, info.height);
+  if (space) {
+    currentUser.equipped[contextActiveLocation] = null;
+    if (!currentUser.equipped.backpack.items) {
+      currentUser.equipped.backpack.items = [];
     }
+    currentUser.equipped.backpack.items.push({
+      id: contextActiveItem.id,
+      type: contextActiveItem.type,
+      x: space.x,
+      y: space.y,
+      count: contextActiveItem.count
+    });
+    saveLobbyData();
+    renderStash();
+    renderLobbyBackpack();
+    renderEquipped();
+    showAnnouncement(`已卸下 ${info.name} 至背包`, 'success');
+    return;
   }
 
   showAnnouncement('倉庫與背包空間均不足，無法卸下！', 'error');
@@ -1544,9 +1561,8 @@ document.getElementById('ctx-transfer-to-bag').addEventListener('click', () => {
   const info = ITEMS[contextActiveItem.type];
   if (!info) return;
 
-  if (!currentUser.equipped.backpack || currentUser.equipped.backpack.type === null) {
-    showAnnouncement('您沒有裝備背包，無法移入！', 'error');
-    return;
+  if (!currentUser.equipped.backpack) {
+    currentUser.equipped.backpack = { type: null, items: [] };
   }
 
   const space = findFreeLobbyBagSpace(info.width, info.height);
@@ -1614,7 +1630,9 @@ function findFreeStashSpace(w, h) {
 
 // Find free Lobby Backpack coordinates
 function findFreeLobbyBagSpace(w, h) {
-  if (!currentUser.equipped.backpack || currentUser.equipped.backpack.type === null) return null;
+  if (!currentUser.equipped.backpack) {
+    currentUser.equipped.backpack = { type: null, items: [] };
+  }
   const dims = getPlayerBagDimensions(currentUser.equipped, currentUser.level);
   const items = currentUser.equipped.backpack.items || [];
   return findFreeSpaceInGrid(dims.cols, dims.rows, items, w, h);
@@ -1642,7 +1660,8 @@ function renderShop() {
     { type: 'rifle', rarity: 'white' },
     { type: 'armor_heavy', rarity: 'white' },
     { type: 'helmet', rarity: 'white' },
-    { type: 'backpack_small', rarity: 'white' }
+    { type: 'backpack_small', rarity: 'white' },
+    { type: 'cheat_card', rarity: 'white' }
   ];
 
   const shopItems = [...basicItems];
@@ -1838,6 +1857,10 @@ function sellItem(item, location) {
 
   // Add Cash
   const reward = stats.sellPrice * (item.count || 1);
+  if (reward < 0 && currentUser.cash + reward < 0) {
+    showAnnouncement(`處置費用不足！你需要支付 $${Math.abs(reward)} 美金，但當前只有 $${currentUser.cash} 美金！`, 'error');
+    return;
+  }
   currentUser.cash += reward;
 
   // Delete item from stash/equipped/backpack
@@ -1944,6 +1967,7 @@ function showTooltip(e, itemInput) {
     white: '白色 (普通)',
     green: '綠色 (精良)',
     blue: '藍色 (稀有)',
+    purple: '紫色 (垃圾)',
     gold: '金色 (史詩)',
     red: '紅色 (傳說)'
   }[stats.rarity];
@@ -1988,6 +2012,9 @@ function showTooltip(e, itemInput) {
   } else if (stats.type === 'special') {
     html += `<div class="tooltip-row"><span class="tooltip-label">類型:</span><span class="tooltip-value">特殊物品</span></div>`;
     html += `<div class="tooltip-row"><span class="tooltip-label">功能:</span><span class="tooltip-value" style="color:#00ff88; font-weight:800;">除迷霧 (全圖可見)</span></div>`;
+  } else if (stats.type === 'trash') {
+    html += `<div class="tooltip-row"><span class="tooltip-label">類型:</span><span class="tooltip-value" style="color:#bf5af2; font-weight:800;">特殊垃圾 (廢品)</span></div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-label">警告:</span><span class="tooltip-value" style="color:#ff3b30; font-weight:bold;">撿起將塞滿所有背包空格！</span></div>`;
   }
 
   if (stats.maxDurability !== undefined && stats.durability !== undefined) {
