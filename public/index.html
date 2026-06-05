@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>《紅區 (RED ZONE)》2D 俯視角多人撤離射擊遊戲</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Animated Background Elements -->
+  <div class="bg-gradient"></div>
+  <div class="bg-grid"></div>
+
+  <!-- ==========================================
+       1. LOGIN / REGISTER SCREEN
+       ========================================== -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <h1>RED ZONE</h1>
+      <div class="subtitle">2D Extraction Shooter</div>
+      
+      <div class="login-tabs">
+        <button id="tab-login" class="login-tab active">登入</button>
+        <button id="tab-register" class="login-tab">註冊</button>
+      </div>
+
+      <div class="form-group">
+        <label for="auth-username">使用者帳號</label>
+        <input type="text" id="auth-username" placeholder="請輸入帳號" autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="auth-password">密碼</label>
+        <input type="password" id="auth-password" placeholder="請輸入密碼">
+      </div>
+
+      <button id="btn-auth-submit" class="login-btn">登 入</button>
+      <div id="auth-error" class="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       2. GAME LOBBY SCREEN
+       ========================================== -->
+  <div id="lobby-screen" class="lobby-screen hidden">
+    <!-- Top Bar Dashboard -->
+    <div class="top-bar">
+      <div class="player-info">
+        <div id="lobby-username" class="username-display">---</div>
+        <div class="level-badge">LV <span id="lobby-level">1</span></div>
+        <div class="xp-container">
+          <div class="xp-label">XP 進度: <span id="lobby-xp-text">0 / 1000</span></div>
+          <div class="xp-bar-bg">
+            <div id="lobby-xp-bar" class="xp-bar-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lobby-stats">
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-right: 15px;">
+          <div class="cash-display" style="margin: 0;">美金餘額: $<span id="lobby-cash">0</span></div>
+          <div class="medals-display" style="font-size: 12px; color: #ffaa00; font-weight: 700; text-shadow: 0 0 6px rgba(255,170,0,0.4); display: flex; align-items: center; gap: 4px;">榮耀勳章: <span id="lobby-medals">0</span> 個 (攻擊力 +<span id="lobby-medals-bonus">0</span>)</div>
+        </div>
+        <div class="top-bar-btns">
+          <button id="btn-leaderboard" class="btn-secondary">財富排行榜</button>
+          <button id="btn-gacha-open" class="btn-secondary" style="background: linear-gradient(135deg, #ffaa00, #ff0055); color: #fff; font-weight: bold; border: none; box-shadow: 0 0 10px rgba(255, 0, 85, 0.4); text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">幸運抽獎</button>
+          <button id="btn-bankruptcy" class="btn-secondary btn-relief hidden">領取破產補助 ($2000)</button>
+          <button id="btn-logout" class="btn-secondary btn-logout">登出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="lobby-main">
+      <!-- Equipped Gear Slots (Left) -->
+      <div class="equipment-wrapper">
+        <div class="section-header">
+          <span>角色穿戴裝備</span>
+        </div>
+        
+        <div class="equipment-grid">
+          <!-- Helmet (2x2) -->
+          <div id="slot-helmet" class="equip-slot slot-helmet" data-slot="helmet">
+            <span class="slot-label">頭盔 (2x2)</span>
+          </div>
+
+          <!-- Armor (2x2) -->
+          <div id="slot-armor" class="equip-slot slot-armor" data-slot="armor">
+            <span class="slot-label">護甲 (2x2)</span>
+          </div>
+
+          <!-- Primary Weapon (4x2) -->
+          <div id="slot-weapon" class="equip-slot slot-weapon" data-slot="weapon">
+            <span class="slot-label">主武器 (4x2)</span>
+          </div>
+
+          <!-- Backpack (2x2) -->
+          <div id="slot-backpack" class="equip-slot slot-backpack" data-slot="backpack">
+            <span class="slot-label">戰術背包 (2x2)</span>
+          </div>
+
+          <!-- Pocket 1 (Medical-only) -->
+          <div id="slot-pocket1" class="equip-slot slot-pocket1" data-slot="pocket1">
+            <span class="slot-label">口袋 1 (醫療)</span>
+          </div>
+
+          <!-- Pocket 2 (Medical-only) -->
+          <div id="slot-pocket2" class="equip-slot slot-pocket2" data-slot="pocket2">
+            <span class="slot-label">口袋 2 (醫療)</span>
+          </div>
+
+          <!-- Ammo Slot (2x2) -->
+          <div id="slot-ammo" class="equip-slot slot-ammo" data-slot="ammo">
+            <span class="slot-label">子彈 (2x2)</span>
+          </div>
+        </div>
+
+        <div class="section-header" style="margin-top: 15px;">
+          <span>快捷鍵欄 (1~5)</span>
+        </div>
+        <div class="lobby-hotbar">
+          <div id="slot-quick1" class="equip-slot slot-quick" data-slot="quick1">
+            <span class="slot-key">1</span>
+            <span class="slot-label">快捷 1</span>
+          </div>
+          <div id="slot-quick2" class="equip-slot slot-quick" data-slot="quick2">
+            <span class="slot-key">2</span>
+            <span class="slot-label">快捷 2</span>
+          </div>
+          <div id="slot-quick3" class="equip-slot slot-quick" data-slot="quick3">
+            <span class="slot-key">3</span>
+            <span class="slot-label">快捷 3</span>
+          </div>
+          <div id="slot-quick4" class="equip-slot slot-quick" data-slot="quick4">
+            <span class="slot-key">4</span>
+            <span class="slot-label">快捷 4</span>
+          </div>
+          <div id="slot-quick5" class="equip-slot slot-quick" data-slot="quick5">
+            <span class="slot-key">5</span>
+            <span class="slot-label">快捷 5</span>
+          </div>
+        </div>
+
+        <!-- Deploy Action Button -->
+        <div class="deploy-btn-wrapper">
+          <button id="btn-deploy" class="btn-deploy">部署出戰 DEPLOY</button>
+        </div>
+
+        <!-- Daily Quests Panel -->
+        <div class="quests-wrapper" style="margin-top: 15px;">
+          <div class="section-header">
+            <span>每日任務 (<span id="quest-summary-count">0/3</span>)</span>
+          </div>
+          <div id="quest-list-container" class="quest-list-container" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid Inventory Stash (Center) -->
+      <div class="inventory-section" style="flex-direction: row; gap: 20px;">
+        <!-- Lobby Backpack Grid (Left) -->
+        <div class="backpack-section-lobby" style="flex: 4; display: flex; flex-direction: column; height: 100%;">
+          <div class="section-header">
+            <span>背包內物品</span>
+          </div>
+          <div class="stash-scroll">
+            <div id="lobby-bag-grid" class="grid-container">
+              <!-- Dynamic Grid cells and items populated via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Lobby Stash Grid (Right) -->
+        <div class="stash-section-lobby" style="flex: 7; display: flex; flex-direction: column; height: 100%;">
+          <div class="section-header">
+            <span>個人倉庫</span>
+            <span style="font-size:11px; color:#a0aec0;">拖曳或右鍵互換/出售</span>
+          </div>
+          <div class="stash-scroll">
+            <div id="stash-grid" class="grid-container">
+              <!-- Dynamic Grid cells and items populated via JavaScript -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Merchant Shop / Black Market (Right) -->
+      <div class="shop-section">
+        <div class="section-header">
+          <span>黑市黑市交易</span>
+        </div>
+        
+        <!-- Shop Listing -->
+        <div id="shop-items-container" class="shop-items-list">
+          <!-- Dynamically populated via JavaScript -->
+        </div>
+
+        <!-- Sell Box Indicator -->
+        <div id="shop-sell-box" class="sell-box">
+          <span class="sell-box-text">將物資拖曳至此處出售</span>
+          <span class="sell-box-sub">或右鍵選單快速出售</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       3. MATCH MATCHMAKING LOADING OVERLAY
+       ========================================== -->
+  <div id="match-overlay" class="match-overlay hidden">
+    <div class="match-spinner"></div>
+    <div class="match-text">正在進入戰區...</div>
+    <div style="font-size:12px; color:#718096; margin-top:-10px;">正在加載伺服器物資與出生點</div>
+  </div>
+
+  <!-- ==========================================
+       4. ACTIVE RAID GAMEPLAY SCREEN
+       ========================================== -->
+  <div id="raid-screen" class="raid-screen hidden">
+    <div id="damage-vignette" class="damage-vignette"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD Stats Display -->
+    <div class="raid-hud">
+      <div class="hud-group">
+        <div class="hud-health-container">
+          <div class="hud-hp-header">
+            <span>生命值</span>
+            <span id="hud-health-text">100 / 100</span>
+          </div>
+          <div class="hud-hp-bar">
+            <div id="hud-health-fill" class="hud-hp-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-group" id="hud-weapon-group">
+        <div style="display:flex; flex-direction:column;">
+          <span id="hud-weapon-name" style="font-size:12px; font-weight:800;">主武器</span>
+          <span class="hud-ammo-label">彈藥狀態</span>
+        </div>
+        <div class="hud-ammo">
+          <span id="hud-ammo-cur">0</span><span style="color:#718096; font-size:16px;"> / <span id="hud-ammo-max">0</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating hotbar inside active raid -->
+    <div id="raid-hotbar" class="raid-hotbar">
+      <div id="hud-quick1" class="raid-hotbar-slot" data-slot="quick1">
+        <span class="hotbar-key">1</span>
+        <div class="hotbar-item-content">
+          <span class="hotbar-item-name">-</span>
+          <span class="hotbar-item-count"></span>
+        </div>
+      </div>
+      <div id="hud-quick2" class="raid-hotbar-slot" data-slot="quick2">
+        <span class="hotbar-key">2</span>
+        <div class="hotbar-item-content">
+          <span class="hotbar-item-name">-</span>
+          <span class="hotbar-item-count"></span>
+        </div>
+      </div>
+      <div id="hud-quick3" class="raid-hotbar-slot" data-slot="quick3">
+        <span class="hotbar-key">3</span>
+        <div class="hotbar-item-content">
+          <span class="hotbar-item-name">-</span>
+          <span class="hotbar-item-count"></span>
+        </div>
+      </div>
+      <div id="hud-quick4" class="raid-hotbar-slot" data-slot="quick4">
+        <span class="hotbar-key">4</span>
+        <div class="hotbar-item-content">
+          <span class="hotbar-item-name">-</span>
+          <span class="hotbar-item-count"></span>
+        </div>
+      </div>
+      <div id="hud-quick5" class="raid-hotbar-slot" data-slot="quick5">
+        <span class="hotbar-key">5</span>
+        <div class="hotbar-item-content">
+          <span class="hotbar-item-name">-</span>
+          <span class="hotbar-item-count"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HUD Right Alerts -->
+    <div class="raid-hud-right">
+      <div class="hud-timer">
+        操作提示: [WASD] 移動 | [滑鼠] 瞄準 & 射擊 | [R] 換彈 | [F] 開箱 | [E] 裝備欄
+      </div>
+      <div id="extract-indicator" class="extract-alert hidden">
+        正在撤離中... 剩餘 <span id="extract-countdown">10</span> 秒
+      </div>
+    </div>
+
+    <!-- Action Read Countdown Bar -->
+    <div id="action-bar" class="action-progressbar hidden">
+      <div id="action-bar-title" class="action-title">正在進行搜刮...</div>
+      <div class="action-bar-bg">
+        <div id="action-bar-fill" class="action-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- IN-RAID OVERLAYS (Interactive) -->
+    <!-- overlay: E key Inventory overlay -->
+    <div id="raid-inventory-overlay" class="raid-overlay-container hidden">
+      <div class="overlay-panel">
+        <div>
+          <div class="overlay-title">角色局內裝備</div>
+          <div class="equipment-grid" style="margin-bottom: 0;">
+            <div id="raid-slot-helmet" class="equip-slot slot-helmet" data-slot="helmet"><span class="slot-label">頭盔</span></div>
+            <div id="raid-slot-armor" class="equip-slot slot-armor" data-slot="armor"><span class="slot-label">護甲</span></div>
+            <div id="raid-slot-weapon" class="equip-slot slot-weapon" data-slot="weapon"><span class="slot-label">主武器</span></div>
+            <div id="raid-slot-backpack" class="equip-slot slot-backpack" data-slot="backpack"><span class="slot-label">戰術背包</span></div>
+            <div id="raid-slot-pocket1" class="equip-slot slot-pocket1" data-slot="pocket1"><span class="slot-label">口袋 1</span></div>
+            <div id="raid-slot-pocket2" class="equip-slot slot-pocket2" data-slot="pocket2"><span class="slot-label">口袋 2</span></div>
+            <div id="raid-slot-ammo" class="equip-slot slot-ammo" data-slot="ammo"><span class="slot-label">子彈</span></div>
+          </div>
+
+          <div class="overlay-title" style="margin-top: 15px;">快捷鍵欄 (1~5)</div>
+          <div class="lobby-hotbar" style="margin-bottom: 0;">
+            <div id="raid-slot-quick1" class="equip-slot slot-quick" data-slot="quick1"><span class="slot-key">1</span><span class="slot-label">快捷 1</span></div>
+            <div id="raid-slot-quick2" class="equip-slot slot-quick" data-slot="quick2"><span class="slot-key">2</span><span class="slot-label">快捷 2</span></div>
+            <div id="raid-slot-quick3" class="equip-slot slot-quick" data-slot="quick3"><span class="slot-key">3</span><span class="slot-label">快捷 3</span></div>
+            <div id="raid-slot-quick4" class="equip-slot slot-quick" data-slot="quick4"><span class="slot-key">4</span><span class="slot-label">快捷 4</span></div>
+            <div id="raid-slot-quick5" class="equip-slot slot-quick" data-slot="quick5"><span class="slot-key">5</span><span class="slot-label">快捷 5</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="overlay-title">背包網格物資</div>
+          <div style="background: rgba(0,0,0,0.3); border:1px solid var(--glass-border); padding: 10px; border-radius: 6px;">
+            <!-- Backpack inner grid container -->
+            <div id="raid-bag-grid" class="grid-container" style="min-height:220px; width: 220px; grid-template-columns: repeat(4, var(--cell-size));">
+              <!-- Empty backpack grid -->
+            </div>
+          </div>
+          <div style="margin-top: 15px; font-size:11px; color:#cbd5e1; text-align:center;">
+            快捷操作：按 [E] 關閉 | 藥品點擊右鍵使用 | 裝備右鍵卸載
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- overlay: Loot box container looting overlay -->
+    <div id="raid-looting-overlay" class="raid-overlay-container hidden">
+      <div class="overlay-panel">
+        <!-- Container Loot Content (Left) -->
+        <div>
+          <div class="overlay-title" id="loot-title">屍體 / 補給箱 物資</div>
+          <div style="background: rgba(0,0,0,0.3); border:1px solid var(--glass-border); padding: 10px; border-radius: 6px;">
+            <div id="loot-box-grid" class="grid-container" style="min-height:220px; width: 220px; grid-template-columns: repeat(4, var(--cell-size));">
+              <!-- Container grid -->
+            </div>
+          </div>
+          <div style="margin-top: 15px; font-size:11px; color:#cbd5e1; text-align:center;">
+            滑鼠點擊物品或按 [F] 鍵快速放入背包
+          </div>
+        </div>
+
+        <!-- Player Backpack Loot Content (Right) -->
+        <div>
+          <div class="overlay-title">您的背包</div>
+          <div style="background: rgba(0,0,0,0.3); border:1px solid var(--glass-border); padding: 10px; border-radius: 6px;">
+            <div id="raid-loot-bag-grid" class="grid-container" style="min-height:220px; width: 220px; grid-template-columns: repeat(4, var(--cell-size));">
+              <!-- Player bag grid while looting -->
+            </div>
+          </div>
+          <div style="margin-top: 15px; font-size:11px; text-align:center;">
+            <button id="btn-close-loot" class="btn-secondary" style="width:100%;">關閉搜刮 UI</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       5. RAID EXTRACTION VICTORY SUMMARY
+       ========================================== -->
+  <div id="extract-summary-screen" class="summary-screen hidden">
+    <div class="summary-card">
+      <div class="summary-title extracted">成功撤離 !</div>
+      <div class="summary-subtitle">已安全將攜帶的物資帶回大廳倉庫</div>
+      
+      <div class="summary-details">
+        <div class="summary-row">
+          <span class="summary-row-label">撤離結果</span>
+          <span class="summary-row-value" style="color:var(--heal-green);">生存撤離</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-row-label">獲得 XP</span>
+          <span class="summary-row-value xp">+300 XP</span>
+        </div>
+      </div>
+
+      <button id="btn-extract-summary-close" class="login-btn">返回安全大廳</button>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       6. RAID DEATH DEFEAT SUMMARY
+       ========================================== -->
+  <div id="death-summary-screen" class="summary-screen hidden">
+    <div class="summary-card">
+      <div class="summary-title died">陣亡 (MIA)</div>
+      <div class="summary-subtitle">您被擊殺了，丟失了所有身上攜帶的防具、武器與物品</div>
+      
+      <div class="summary-details">
+        <div class="summary-row">
+          <span class="summary-row-label">擊殺來源</span>
+          <span id="death-killer-name" class="summary-row-value danger">雷霆巡邏兵</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-row-label">懲罰結果</span>
+          <span class="summary-row-value danger">失去全部穿戴裝備與背包物資</span>
+        </div>
+      </div>
+
+      <button id="btn-death-summary-close" class="login-btn">返回安全大廳</button>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       7. GLOBAL LEADERBOARD MODAL
+       ========================================== -->
+  <div id="leaderboard-modal" class="leaderboard-modal hidden">
+    <div class="leaderboard-card">
+      <div class="section-header">
+        <span>紅區全球財富排行榜 (TOP 10)</span>
+        <button id="btn-close-leaderboard" class="btn-secondary" style="padding: 4px 10px;">關閉</button>
+      </div>
+
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>名次</th>
+            <th>玩家帳號</th>
+            <th>等級</th>
+            <th>美金餘額</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+          <!-- Dynamic contents -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       8. CUSTOM CONTEXT MENU (Hidden by default)
+       ========================================== -->
+  <div id="custom-context-menu" class="context-menu hidden">
+    <div id="ctx-equip" class="context-menu-item">穿戴/裝備</div>
+    <div id="ctx-transfer-to-stash" class="context-menu-item">放入倉庫</div>
+    <div id="ctx-transfer-to-bag" class="context-menu-item">放入背包</div>
+    <div id="ctx-quick-submenu" class="context-menu-submenu-parent">
+      <span>放入快捷鍵</span>
+      <div class="context-submenu">
+        <div id="ctx-quick-1" class="context-menu-item">快捷鍵 1</div>
+        <div id="ctx-quick-2" class="context-menu-item">快捷鍵 2</div>
+        <div id="ctx-quick-3" class="context-menu-item">快捷鍵 3</div>
+        <div id="ctx-quick-4" class="context-menu-item">快捷鍵 4</div>
+        <div id="ctx-quick-5" class="context-menu-item">快捷鍵 5</div>
+      </div>
+    </div>
+    <div id="ctx-unequip" class="context-menu-item">卸載裝備</div>
+    <div id="ctx-use" class="context-menu-item">快速使用</div>
+    <div id="ctx-sell" class="context-menu-item" style="color:var(--accent-yellow);">出售物資</div>
+  </div>
+
+  <!-- In-raid Context Menu (Hidden by default) -->
+  <div id="raid-context-menu" class="context-menu hidden">
+    <div id="raid-ctx-use" class="context-menu-item">快速使用</div>
+    <div id="raid-ctx-equip" class="context-menu-item">裝備/穿戴</div>
+    <div id="raid-ctx-quick-submenu" class="context-menu-submenu-parent">
+      <span>放入快捷鍵</span>
+      <div class="context-submenu">
+        <div id="raid-ctx-quick-1" class="context-menu-item">快捷鍵 1</div>
+        <div id="raid-ctx-quick-2" class="context-menu-item">快捷鍵 2</div>
+        <div id="raid-ctx-quick-3" class="context-menu-item">快捷鍵 3</div>
+        <div id="raid-ctx-quick-4" class="context-menu-item">快捷鍵 4</div>
+        <div id="raid-ctx-quick-5" class="context-menu-item">快捷鍵 5</div>
+      </div>
+    </div>
+    <div id="raid-ctx-put" class="context-menu-item">放入補給箱</div>
+    <div id="raid-ctx-drop" class="context-menu-item" style="color:var(--accent-yellow);">丟棄至地面</div>
+  </div>
+
+
+  <!-- ==========================================
+       GACHA (LUCKY DRAW) MODAL OVERLAY
+       ========================================== -->
+  <div id="gacha-modal" class="gacha-modal hidden">
+    <div class="gacha-modal-content">
+      <button id="btn-gacha-close" class="gacha-close-btn">&times;</button>
+      <h2 class="gacha-title">幸運軍火物資箱</h2>
+      <p class="gacha-subtitle">每次抽獎花費 <span class="gacha-cost-highlight">$5,000 美金</span>，隨機獲得高品質武器、防具、背包與消耗品！</p>
+      
+      <!-- CS:GO style case opening roll window -->
+      <div class="gacha-window-wrapper">
+        <div class="gacha-carousel-viewport">
+          <div class="gacha-pointer"></div>
+          <div id="gacha-carousel-row" class="gacha-carousel-row">
+            <!-- Dynamically populated via JS before spin -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Spin Action Button -->
+      <div class="gacha-action-area">
+        <button id="btn-gacha-roll" class="btn-gacha-roll">開啟軍火箱 ($5,000)</button>
+      </div>
+
+      <!-- Won Item Display (Initially hidden) -->
+      <div id="gacha-won-display" class="gacha-won-display hidden">
+        <div class="gacha-won-label">恭喜獲得</div>
+        <div id="gacha-won-card-container"></div>
+      </div>
+
+      <!-- Preview of possible items -->
+      <div class="gacha-preview-section">
+        <h3 class="gacha-preview-title">可能獲得的品項與稀有度</h3>
+        <div class="gacha-preview-grid">
+          <div class="gacha-preview-item rarity-red">
+            <span class="preview-badge badge-red">紅色 (0.5%)</span>
+            <span class="preview-name">最高階極品裝備/武器</span>
+          </div>
+          <div class="gacha-preview-item rarity-gold">
+            <span class="preview-badge badge-gold">金色 (3.5%)</span>
+            <span class="preview-name">高階傳奇裝備/武器</span>
+          </div>
+          <div class="gacha-preview-item rarity-blue">
+            <span class="preview-badge badge-blue">藍色 (8.0%)</span>
+            <span class="preview-name">中階稀有裝備/武器</span>
+          </div>
+          <div class="gacha-preview-item rarity-green">
+            <span class="preview-badge badge-green">綠色 (18.0%)</span>
+            <span class="preview-name">低階精緻裝備/武器</span>
+          </div>
+          <div class="gacha-preview-item rarity-white">
+            <span class="preview-badge badge-white">白色 (70.0%)</span>
+            <span class="preview-name">基本款裝備、子彈及醫療品</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Global Announcement Notice Banner (Universal Toast) -->
+  <div id="global-announcement" class="announcement-banner hidden">
+    <span id="announcement-text">系統提示</span>
+  </div>
+
+  <!-- Global Item Tooltip HUD (Universal Tooltip) -->
+  <div id="item-tooltip" class="item-tooltip hidden"></div>
+
+  <!-- Load Socket.io client and main game code -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

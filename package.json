@@ -1,0 +1,15 @@
+{
+  "name": "redzone",
+  "version": "1.0.0",
+  "description": "Red Zone (紅區) - 2D Top-Down Multiplayer Extraction Shooter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
